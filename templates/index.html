@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>YouTube Downloader</title>
+  <!-- Bootstrap CSS -->
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+  <style>
+    body { background-color: #f8f9fa; }
+    .container { margin-top: 50px; max-width: 600px; }
+    .card { margin-top: 20px; }
+    .video-thumbnail { max-width: 100%; height: auto; }
+    .back-button { margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2 class="text-center mb-4">YouTube Downloader</h2>
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}
+        <div class="alert alert-danger">
+          {% for message in messages %}
+            <div>{{ message }}</div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+    
+    {% if stage == "input" %}
+      <!-- Stage 1: Input URL and select download format -->
+      <form method="POST">
+        <div class="form-group">
+          <label for="url">Video URL:</label>
+          <input type="text" class="form-control" id="url" name="url" placeholder="Enter YouTube URL" value="{{ url|default('') }}" required>
+        </div>
+        <div class="form-group">
+          <label>Select Download Format:</label>
+          <div class="form-check">
+            <input class="form-check-input" type="radio" name="download_type" id="video" value="video" checked>
+            <label class="form-check-label" for="video">Video (choose resolution)</label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="radio" name="download_type" id="mp3" value="mp3">
+            <label class="form-check-label" for="mp3">Audio (MP3)</label>
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block">Check Video</button>
+      </form>
+    
+    {% elif stage == "choose_video" %}
+      <!-- Stage 2a: Display video info, preview and resolution choices -->
+      <div class="card">
+        <div class="card-body">
+          <h5 class="card-title">{{ video_title }}</h5>
+          {% if embed_url %}
+            <div class="embed-responsive embed-responsive-16by9 mb-3">
+              <iframe class="embed-responsive-item" src="{{ embed_url }}" allowfullscreen></iframe>
+            </div>
+          {% elif thumbnail %}
+            <img src="{{ thumbnail }}" alt="Thumbnail" class="video-thumbnail mb-3">
+          {% endif %}
+          <form method="POST">
+            <!-- Pass URL and download type as hidden inputs -->
+            <input type="hidden" name="url" value="{{ url }}">
+            <input type="hidden" name="download_type" value="video">
+            <div class="form-group">
+              <label for="resolution">Select Resolution:</label>
+              <select class="form-control" id="resolution" name="resolution">
+                {% for res in available_resolutions %}
+                  <option value="{{ res }}">{{ res }}p</option>
+                {% endfor %}
+              </select>
+            </div>
+            <button type="submit" class="btn btn-primary btn-block">Download Video</button>
+          </form>
+          <!-- Back button -->
+          <a href="{{ url_for('index') }}?url={{ url }}" class="btn btn-primary btn-block back-button">Back</a>
+        </div>
+      </div>
+    
+    {% elif stage == "choose_mp3" %}
+      <!-- Stage 2b: Display video info, preview and confirm MP3 download -->
+      <div class="card">
+        <div class="card-body">
+          <h5 class="card-title">{{ video_title }}</h5>
+          {% if thumbnail %}
+            <img src="{{ thumbnail }}" alt="Thumbnail" class="video-thumbnail mb-3">
+          {% endif %}
+          <form method="POST">
+            <!-- Pass URL and download type as hidden inputs -->
+            <input type="hidden" name="url" value="{{ url }}">
+            <input type="hidden" name="download_type" value="mp3">
+            <input type="hidden" name="confirm_mp3" value="1">
+            <button type="submit" class="btn btn-primary btn-block">Download MP3</button>
+          </form>
+          <!-- Back button -->
+          <a href="{{ url_for('index') }}?url={{ url }}" class="btn btn-primary btn-block back-button">Back</a>
+        </div>
+      </div>
+    
+    {% elif stage == "download" %}
+      <!-- Stage 3: Download ready, display the download link -->
+      <div class="card">
+        <div class="card-body text-center">
+          <h5 class="card-title">Download Ready!</h5>
+          <p class="card-text">Click the button below to download your file. The file will be deleted from the server after download.</p>
+          <a href="{{ url_for('download_file', filename=filename) }}" class="btn btn-primary btn-block">Download File</a>
+          <!-- Back button -->
+          <a href="{{ url_for('index') }}?url={{ url }}" class="btn btn-primary btn-block back-button">Back</a>
+        </div>
+      </div>
+    
+    {% endif %}
+  </div>
+  
+  <!-- Bootstrap JS and dependencies -->
+  <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
+  <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+</body>
+</html>
