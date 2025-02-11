@@ -4,16 +4,10 @@ from flask import Flask, request, render_template_string, send_file, redirect, u
 import yt_dlp
 
 app = Flask(__name__)
-app.secret_key = "supersecretkey"  # Change to a more secure key in production
+app.secret_key = "supersecretkey"  # Change this for production
 
-# Use the system temporary directory so files are not stored permanently.
 DOWNLOAD_FOLDER = tempfile.gettempdir()
 
-# HTML template with multiple stages:
-# - stage="input": Input URL and select download format.
-# - stage="choose_video": Display video info and a dropdown for available resolutions.
-# - stage="choose_mp3": Display video info to confirm MP3 download.
-# - stage="download": Display the download link when the file is ready.
 HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="en">
@@ -66,11 +60,15 @@ HTML_TEMPLATE = """
       </form>
     
     {% elif stage == "choose_video" %}
-      <!-- Stage 2a: Display video info and resolution choices -->
+      <!-- Stage 2a: Display video info, preview and resolution choices -->
       <div class="card">
         <div class="card-body">
           <h5 class="card-title">{{ video_title }}</h5>
-          {% if thumbnail %}
+          {% if embed_url %}
+            <div class="embed-responsive embed-responsive-16by9 mb-3">
+              <iframe class="embed-responsive-item" src="{{ embed_url }}" allowfullscreen></iframe>
+            </div>
+          {% elif thumbnail %}
             <img src="{{ thumbnail }}" alt="Thumbnail" class="video-thumbnail mb-3">
           {% endif %}
           <form method="POST">
@@ -87,17 +85,21 @@ HTML_TEMPLATE = """
             </div>
             <button type="submit" class="btn btn-primary btn-block">Download Video</button>
           </form>
-          <!-- Back button returns to input stage preserving the URL -->
+          <!-- Back button -->
           <a href="{{ url_for('index') }}?url={{ url }}" class="btn btn-primary btn-block back-button">Back</a>
         </div>
       </div>
     
     {% elif stage == "choose_mp3" %}
-      <!-- Stage 2b: Display video info for MP3 download confirmation -->
+      <!-- Stage 2b: Display video info, preview and confirm MP3 download -->
       <div class="card">
         <div class="card-body">
           <h5 class="card-title">{{ video_title }}</h5>
-          {% if thumbnail %}
+          {% if embed_url %}
+            <div class="embed-responsive embed-responsive-16by9 mb-3">
+              <iframe class="embed-responsive-item" src="{{ embed_url }}" allowfullscreen></iframe>
+            </div>
+          {% elif thumbnail %}
             <img src="{{ thumbnail }}" alt="Thumbnail" class="video-thumbnail mb-3">
           {% endif %}
           <form method="POST">
@@ -138,11 +140,10 @@ HTML_TEMPLATE = """
 @app.route("/", methods=["GET", "POST"])
 def index():
     if request.method == "GET":
-        # On refresh or initial GET, always display the input stage.
         url_value = request.args.get("url", "")
         return render_template_string(HTML_TEMPLATE, stage="input", url=url_value)
     else:
-        # Handle POST requests.
+        # For Handle POST requests.
         if "resolution" in request.form:
             # Process video download.
             url = request.form.get("url").strip()
@@ -157,12 +158,12 @@ def index():
                 "noplaylist": True,
                 "quiet": True,
             }
-            # Check if file exists (based on metadata).
+            # Check Video If Exist.
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(url, download=False)
                 filename = ydl.prepare_filename(info)
             if not os.path.exists(filename):
-                # If file does not exist, download it.
+                # Download the file if not exists.
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                     info = ydl.extract_info(url, download=True)
                     filename = ydl.prepare_filename(info)
@@ -198,7 +199,7 @@ def index():
                                           filename=os.path.basename(filename),
                                           url=url)
         else:
-            # Stage 1: Validate URL and fetch video metadata.
+            # For validate Video.
             url = request.form.get("url", "").strip()
             download_type = request.form.get("download_type", "video")
             if not url:
@@ -212,6 +213,9 @@ def index():
                 return render_template_string(HTML_TEMPLATE, stage="input", url="")
             video_title = info.get("title", "Video")
             thumbnail = info.get("thumbnail", "")
+            video_id = info.get("id", "")
+            embed_url = f"https://www.youtube.com/embed/{video_id}" if video_id else ""
+            
             if download_type == "video":
                 # Collect available video resolutions.
                 resolutions = set()
@@ -227,13 +231,15 @@ def index():
                                               url=url,
                                               video_title=video_title,
                                               thumbnail=thumbnail,
-                                              available_resolutions=available_resolutions)
+                                              available_resolutions=available_resolutions,
+                                              embed_url=embed_url)
             elif download_type == "mp3":
                 return render_template_string(HTML_TEMPLATE,
                                               stage="choose_mp3",
                                               url=url,
                                               video_title=video_title,
-                                              thumbnail=thumbnail)
+                                              thumbnail=thumbnail,
+                                              embed_url=embed_url)
             else:
                 flash("Invalid download type.")
                 return render_template_string(HTML_TEMPLATE, stage="input", url="")
